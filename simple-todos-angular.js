@@ -22,11 +22,17 @@ if (Meteor.isClient) {
       };
 
       $scope.addTask = function(newTask) {
-        $scope.tasks.push( {
+        $scope.tasks.push({
           text: newTask,
-          createdAt: new Date() }
+          createdAt: new Date(),             // current time
+          owner: Meteor.userId(),            // _id of logged in user
+          username: Meteor.user().username}  // username of logged in user
         );
       };
 
   }]);
+
+  Accounts.ui.config({
+    passwordSignupFields: "USERNAME_ONLY"
+  });
 }
