@@ -1,9 +1,22 @@
 Tasks = new Mongo.Collection("tasks");
 
+if (Meteor.isServer) {
+  Meteor.publish("tasks", function () {
+    return Tasks.find({
+      $or: [
+        { private: {$ne: true} },
+        { owner: this.userId }
+      ]
+    });
+  });
+}
+
 if (Meteor.isClient) {
   var app = angular.module("simple-todos",['angular-meteor']);
 
   app.controller("TodosListCtrl", ['$scope', '$meteor', function($scope, $meteor){
+
+      $scope.$meteorSubscribe("tasks");
 
       $scope.$watch('hideCompleted', function() {
         if ($scope.hideCompleted) {
@@ -33,12 +46,17 @@ if (Meteor.isClient) {
         $meteor.call("setChecked", task._id, !task.checked);
       };
 
+      $scope.setPrivate = function(task) {
+        $meteor.call("setPrivate", task._id, ! task.private);
+      };
+
   }]);
 
   Accounts.ui.config({
     passwordSignupFields: "USERNAME_ONLY"
   });
 }
+
 
 Meteor.methods({
   addTask: function (text) {
@@ -55,9 +73,30 @@ Meteor.methods({
     });
   },
   deleteTask: function (taskId) {
+    var task = Tasks.findOne(taskId);
+    if (task.private && task.owner !== Meteor.userId()) {
+      // If the task is private, make sure only the owner can delete it
+      throw new Meteor.Error("not-authorized");
+    }
     Tasks.remove(taskId);
   },
   setChecked: function (taskId, setChecked) {
+    var task = Tasks.findOne(taskId);
+    if (task.private && task.owner !== Meteor.userId()) {
+      // If the task is private, make sure only the owner can check it off
+      throw new Meteor.Error("not-authorized");
+    }
+
     Tasks.update(taskId, { $set: { checked: setChecked} });
+  },
+  setPrivate: function (taskId, setToPrivate) {
+    var task = Tasks.findOne(taskId);
+
+    // Make sure only the task owner can make a task private
+    if (task.owner !== Meteor.userId()) {
+      throw new Meteor.Error("not-authorized");
+    }
+
+    Tasks.update(taskId, { $set: { private: setToPrivate } });
   }
 });
